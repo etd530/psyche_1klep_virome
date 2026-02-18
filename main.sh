@@ -25,17 +25,17 @@ genome=0a_genomes/${species}*.fna.gz                    # 0a_genomes/acleris_abi
 # Get base name of genome
 genome_pre=$(basename $genome)                          # acleris_abietana.GCA_965276485.1.sequences.renamed.fna.gz
 
-#### STEP 1 #### NOT USED ANYMORE BC REAL VIRUSES MAY MAP TO EVE REGIONS OR TEs
+#### STEP 1 ####
 # Map the HiFi reads to the corresponding reference genome, 
 # and split the Lepidoptera reads from those that most likely are not Lepidoptera
 # cd 1a_mapped_hifi_reads
-# /usr/bin/time -o ${reads_pre}.time -v bash ./minimap2.hifi.sh ../$reads ../$genome
+# /usr/bin/time -o ${reads_pre}.time -v bash ./minimap2.hifi.sh ../$reads ../$genome $threads
 # cd ..
 
 #### STEP 2 ####
 # Assemble the non-Lep reads using viralFlye
 cd 2a_dna_virome_assembly
-/usr/bin/time -o ${reads_pre}.time -v bash ./viralflye.sh ../$reads $threads
+/usr/bin/time -o ${reads_pre}.time -v bash ./viralflye.sh ../1a_mapped_hifi_reads/${reads_simple}.nonLep.fq.gz $threads
 if [ -s ${reads_simple}.viralFlye/circulars_viralFlye.fasta ]; then
     mv ${reads_simple}.viralFlye/circulars_viralFlye.fasta ${reads_simple}.viralFlye/${reads_simple}.circulars_viralFlye.fasta
 fi
@@ -47,55 +47,55 @@ cd ..
 
 #### STEP 3 ####
 # Identify viral contigs with VirSorter2 (only if something was assembled)
-cd 3_viral_contig_identification
-if [ -s ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.circulars_viralFlye.fasta ]; then
-    /usr/bin/time -o ${reads_pre}.time -v bash ./vs2.sh ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.circulars_viralFlye.fasta $threads
-    if [ -s ${reads_simple}.circulars_viralFlye.vs2.out/final-viral-combined.fa ]; then
-        mv ${reads_simple}.circulars_viralFlye.vs2.out/final-viral-combined.fa ${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa
-        sed -Ei 's/\|\|/\./g' ${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa
-        sed -Ei 's/\|\|/\./g' ${reads_simple}.circulars_viralFlye.vs2.out/final-viral-score.tsv
-    fi
-else
-    echo -e "WARNING: No circular contigs assembled for ${reads_simple}"
-fi
+# cd 3_viral_contig_identification
+# if [ -s ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.circulars_viralFlye.fasta ]; then
+#     /usr/bin/time -o ${reads_pre}.time -v bash ./vs2.sh ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.circulars_viralFlye.fasta $threads
+#     if [ -s ${reads_simple}.circulars_viralFlye.vs2.out/final-viral-combined.fa ]; then
+#         mv ${reads_simple}.circulars_viralFlye.vs2.out/final-viral-combined.fa ${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa
+#         sed -Ei 's/\|\|/\./g' ${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa
+#         sed -Ei 's/\|\|/\./g' ${reads_simple}.circulars_viralFlye.vs2.out/final-viral-score.tsv
+#     fi
+# else
+#     echo -e "WARNING: No circular contigs assembled for ${reads_simple}"
+# fi
 
-if [ -s ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.linears_viralFlye.fasta ]; then
-    /usr/bin/time -o ${reads_pre}.time -v bash ./vs2.sh ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.linears_viralFlye.fasta $threads
-    if [ -s ${reads_simple}.linears_viralFlye.vs2.out/final-viral-combined.fa ]; then
-        mv ${reads_simple}.linears_viralFlye.vs2.out/final-viral-combined.fa ${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa
-        sed -Ei 's/\|\|/\./g' ${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa
-        sed -Ei 's/\|\|/\./g' ${reads_simple}.linears_viralFlye.vs2.out/final-viral-score.tsv
-    fi
-else
-    echo -e "WARNING: No linear contigs assembled for ${reads_simple}"
-fi
+# if [ -s ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.linears_viralFlye.fasta ]; then
+#     /usr/bin/time -o ${reads_pre}.time -v bash ./vs2.sh ../2a_dna_virome_assembly/${reads_simple}.viralFlye/${reads_simple}.linears_viralFlye.fasta $threads
+#     if [ -s ${reads_simple}.linears_viralFlye.vs2.out/final-viral-combined.fa ]; then
+#         mv ${reads_simple}.linears_viralFlye.vs2.out/final-viral-combined.fa ${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa
+#         sed -Ei 's/\|\|/\./g' ${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa
+#         sed -Ei 's/\|\|/\./g' ${reads_simple}.linears_viralFlye.vs2.out/final-viral-score.tsv
+#     fi
+# else
+#     echo -e "WARNING: No linear contigs assembled for ${reads_simple}"
+# fi
 
-cd ..
+# cd ..
 
 #### STEP 4 ####
 # QC the viral contigs with checkV
-cd 4_checkv
-if [ -s ../3_viral_contig_identification/${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa ]; then
-    /usr/bin/time -o ${reads_pre}.time -v bash ./checkv.sh ../3_viral_contig_identification/${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa $threads
-    grep High-quality ${reads_simple}.circulars.checkv/quality_summary.tsv | cut -f1,3 | grep 'No' | cut -f1 > ${reads_simple}.checkv_circulars.high_quality.viruses.txt || true       # adding '|| true' prevents empty grep from causing an error
-    grep High-quality ${reads_simple}.circulars.checkv/quality_summary.tsv | cut -f1,3 | grep 'Yes' | cut -f1 > ${reads_simple}.checkv_circulars.high_quality.proviruses.txt || true
-    samtools faidx -r ${reads_simple}.checkv_circulars.high_quality.viruses.txt ${reads_simple}.circulars.checkv/viruses.fna > ${reads_simple}.checkv_circulars.high_quality.viruses.fa || true # empty faidx also returns error
-    samtools faidx -r ${reads_simple}.checkv_circulars.high_quality.proviruses.txt ${reads_simple}.circulars.checkv/proviruses.fna > ${reads_simple}.checkv_circulars.high_quality.proviruses.fa || true
-else
-    echo -e "WARNING: No circular contigs identified as viral by VirSorter2 for ${reads_simple}"
-fi
+# cd 4_checkv
+# if [ -s ../3_viral_contig_identification/${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa ]; then
+#     /usr/bin/time -o ${reads_pre}.time -v bash ./checkv.sh ../3_viral_contig_identification/${reads_simple}.circulars_viralFlye.vs2.out/${reads_simple}.circulars.fa $threads
+#     grep High-quality ${reads_simple}.circulars.checkv/quality_summary.tsv | cut -f1,3 | grep 'No' | cut -f1 > ${reads_simple}.checkv_circulars.high_quality.viruses.txt || true       # adding '|| true' prevents empty grep from causing an error
+#     grep High-quality ${reads_simple}.circulars.checkv/quality_summary.tsv | cut -f1,3 | grep 'Yes' | cut -f1 > ${reads_simple}.checkv_circulars.high_quality.proviruses.txt || true
+#     samtools faidx -r ${reads_simple}.checkv_circulars.high_quality.viruses.txt ${reads_simple}.circulars.checkv/viruses.fna > ${reads_simple}.checkv_circulars.high_quality.viruses.fa || true # empty faidx also returns error
+#     samtools faidx -r ${reads_simple}.checkv_circulars.high_quality.proviruses.txt ${reads_simple}.circulars.checkv/proviruses.fna > ${reads_simple}.checkv_circulars.high_quality.proviruses.fa || true
+# else
+#     echo -e "WARNING: No circular contigs identified as viral by VirSorter2 for ${reads_simple}"
+# fi
 
-if [ -s ../3_viral_contig_identification/${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa ]; then
-    /usr/bin/time -o ${reads_pre}.time -v bash ./checkv.sh ../3_viral_contig_identification/${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa $threads
-    grep High-quality ${reads_simple}.linears.checkv/quality_summary.tsv | cut -f1,3 | grep 'No' | cut -f1 > ${reads_simple}.checkv_linears.high_quality.viruses.txt || true       # adding '|| true' prevents empty grep from causing an error
-    grep High-quality ${reads_simple}.linears.checkv/quality_summary.tsv | cut -f1,3 | grep 'Yes' | cut -f1 > ${reads_simple}.checkv_linears.high_quality.proviruses.txt || true
-    samtools faidx -r ${reads_simple}.checkv_linears.high_quality.viruses.txt ${reads_simple}.linears.checkv/viruses.fna > ${reads_simple}.checkv_linears.high_quality.viruses.fa || true # empty faidx also returns error
-    samtools faidx -r ${reads_simple}.checkv_linears.high_quality.proviruses.txt ${reads_simple}.linears.checkv/proviruses.fna > ${reads_simple}.checkv_linears.high_quality.proviruses.fa || true
-else
-    echo -e "WARNING: No linear contigs identified as viral by VirSorter2 for ${reads_simple}"
-fi
+# if [ -s ../3_viral_contig_identification/${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa ]; then
+#     /usr/bin/time -o ${reads_pre}.time -v bash ./checkv.sh ../3_viral_contig_identification/${reads_simple}.linears_viralFlye.vs2.out/${reads_simple}.linears.fa $threads
+#     grep High-quality ${reads_simple}.linears.checkv/quality_summary.tsv | cut -f1,3 | grep 'No' | cut -f1 > ${reads_simple}.checkv_linears.high_quality.viruses.txt || true       # adding '|| true' prevents empty grep from causing an error
+#     grep High-quality ${reads_simple}.linears.checkv/quality_summary.tsv | cut -f1,3 | grep 'Yes' | cut -f1 > ${reads_simple}.checkv_linears.high_quality.proviruses.txt || true
+#     samtools faidx -r ${reads_simple}.checkv_linears.high_quality.viruses.txt ${reads_simple}.linears.checkv/viruses.fna > ${reads_simple}.checkv_linears.high_quality.viruses.fa || true # empty faidx also returns error
+#     samtools faidx -r ${reads_simple}.checkv_linears.high_quality.proviruses.txt ${reads_simple}.linears.checkv/proviruses.fna > ${reads_simple}.checkv_linears.high_quality.proviruses.fa || true
+# else
+#     echo -e "WARNING: No linear contigs identified as viral by VirSorter2 for ${reads_simple}"
+# fi
 
-cd ..
+# cd ..
 
 # #### STEP 5 ####
 # # Align the viral contigs to the host's reference genome using MUMMER to ensure they are not EVEs
@@ -225,32 +225,32 @@ cd ..
 
 #### STEP 8 ####
 # Classify the viral contigs with Metabuli
-cd 9_metabuli
+# cd 9_metabuli
 
-# Run for linear viruses if any exist
-if [ -s ../4_checkv/${reads_simple}.checkv_linears.high_quality.viruses.fa ]; then
-    /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_linears.high_quality.viruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
-else
-    echo -e "WARNING: No high-quality linear free viruses to classify for ${reads_simple}"
-fi
+# # Run for linear viruses if any exist
+# if [ -s ../4_checkv/${reads_simple}.checkv_linears.high_quality.viruses.fa ]; then
+#     /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_linears.high_quality.viruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
+# else
+#     echo -e "WARNING: No high-quality linear free viruses to classify for ${reads_simple}"
+# fi
 
-# Run for linear proviruses if any exist
-if [ -s ../4_checkv/${reads_simple}.checkv_linears.high_quality.proviruses.fa ]; then
-    /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_linears.high_quality.proviruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
-else
-    echo -e "WARNING: No high-quality linear proviruses to classify for ${reads_simple}"
-fi
+# # Run for linear proviruses if any exist
+# if [ -s ../4_checkv/${reads_simple}.checkv_linears.high_quality.proviruses.fa ]; then
+#     /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_linears.high_quality.proviruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
+# else
+#     echo -e "WARNING: No high-quality linear proviruses to classify for ${reads_simple}"
+# fi
 
-# Run for circular viruses if any exist
-if [ -s ../4_checkv/${reads_simple}.checkv_circulars.high_quality.viruses.fa ]; then
-    /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_circulars.high_quality.viruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
-else
-    echo -e "WARNING: No high-quality circular free viruses to classify for ${reads_simple}"
-fi
+# # Run for circular viruses if any exist
+# if [ -s ../4_checkv/${reads_simple}.checkv_circulars.high_quality.viruses.fa ]; then
+#     /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_circulars.high_quality.viruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
+# else
+#     echo -e "WARNING: No high-quality circular free viruses to classify for ${reads_simple}"
+# fi
 
-# Run for circular proviruses if any exist
-if [ -s ../4_checkv/${reads_simple}.checkv_circulars.high_quality.proviruses.fa ]; then
-    /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_circulars.high_quality.proviruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
-else
-    echo -e "WARNING: No high-quality circular proviruses to classify for ${reads_simple}"
-fi
+# # Run for circular proviruses if any exist
+# if [ -s ../4_checkv/${reads_simple}.checkv_circulars.high_quality.proviruses.fa ]; then
+#     /usr/bin/time -o ${reads_simple}.time -v bash ./metabuli.sh ../4_checkv/${reads_simple}.checkv_circulars.high_quality.proviruses.fa /data/databases/metabuli_refseq_viruses/refseq_virus/ $threads
+# else
+#     echo -e "WARNING: No high-quality circular proviruses to classify for ${reads_simple}"
+# fi
