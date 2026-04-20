@@ -1,3 +1,16 @@
-*.stderr
-*.stdout
-*.time
+# Source - https://stackoverflow.com/a/987162
+# Posted by Joakim Elofsson, modified by community. See post 'Timeline' for change history
+# Retrieved 2026-04-20, License - CC BY-SA 3.0
+
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!*.py
+!*.sh
+!*.Rscript
+!*.R
+
+# ...even if they are in subdirectories
+!*/

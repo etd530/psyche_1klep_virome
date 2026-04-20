@@ -21,7 +21,7 @@ for f in 4b_SPADES_checkv/*/quality_summary.tsv; do
 done
 checkv_header=$(head -n1 $file)
 
-echo -e "Species\tLibrary\tSource\tContig_ID\tseqname\tRNA\tNCLDV\tssDNA\tLavidaviridae\tNaldaviricetes\tmax_score\tmax_score_group\tlength\thallmark\tviral\tcellular\t${checkv_header}\tblastn_viral_mrca\tmetabuli_score\tmetabuli_classification" > psyche_viruses_summary.SPADES.tsv
+echo -e "Species\tLibrary\tSource\tContig_ID\tseqname\tRNA\tNCLDV\tssDNA\tLavidaviridae\tNaldaviricetes\tmax_score\tmax_score_group\tlength\thallmark\tviral\tcellular\t${checkv_header}\tcheckv_classification\tmetabuli_score\tmetabuli_classification\tvclust_cluster" > psyche_viruses_summary.SPADES.tsv
 
 # Iterate over contigs that were classified as high quality by checkV
 for file in 4b_SPADES_checkv/*fa; do
@@ -30,7 +30,7 @@ for file in 4b_SPADES_checkv/*fa; do
 		# Get the species and library name
 		species=$(basename $file | cut -f1 -d'.')
 		library=$(basename $file | cut -f2 -d'.')
-		echo -e "${file}"
+		# echo -e "${file}"
 		# Determine if RNA or DNA based on filename
 		if [[ $file == *spades* ]]; then
 			source="RNA"
@@ -41,13 +41,16 @@ for file in 4b_SPADES_checkv/*fa; do
 		# List the contig IDs in the file and iterate over them
 		contigs_list=$(grep '^>' $file | sed 's/>//g')
 		for contig in $contigs_list; do
+			echo $contig
 			vs2_line=$(grep "$contig\b" 3b_SPADES_viral_contig_identification/${species}.${library}*/final-viral-score.tsv | cut -f2 -d':')
 			checkv_line=$(grep "$contig\b" 4b_SPADES_checkv/${species}.${library}*/quality_summary.tsv | cut -f2- -d':')
-			if grep -q "$contig\b" 6b_nucleotide_blast/${species}.${library}*.vs.nt.out.mrcas.tsv; then
-				blastn_mrca=$(grep "$contig\b" 6b_nucleotide_blast/${species}.${library}*.vs.nt.out.mrcas.tsv | cut -f2)
+			aai_top_hit=$(grep "$contig\b" 4b_SPADES_checkv/${species}.${library}*/completeness.tsv | cut -f9)
+			if [ "${aai_top_hit}" == "NA" ]; then
+				checkv_classification="NA"
 			else
-				blastn_mrca="No blastn hits"
+				checkv_classification=$(grep $aai_top_hit /data/databases/checkv/checkv-db-v1.5/genome_db/checkv_info.tsv | cut -f15)
 			fi
+			echo $checkv_classification
 			if grep -q "$contig\b" 9b_metabuli_spades/${species}.${library}/${species}.${library}*viruses_classifications.tsv; then
 				metabuli_score=$(grep "$contig\b" 9b_metabuli_spades/${species}.${library}/${species}.${library}*viruses_classifications.tsv | cut -f5)
 				metabuli_class=$(grep "$contig\b" 9b_metabuli_spades/${species}.${library}/${species}.${library}*viruses_classifications.tsv | cut -f7)
@@ -55,7 +58,12 @@ for file in 4b_SPADES_checkv/*fa; do
 				metabuli_score="No metabuli score"
 				metabuli_class="No metabuli classification"
 			fi
-			echo -e "${species}\t${library}\t${source}\t${contig}\t${vs2_line}\t${checkv_line}\t${blastn_mrca}\t${metabuli_score}\t${metabuli_class}" >> psyche_viruses_summary.SPADES.tsv
+			if grep -q "$contig\b" clustering/clusters.tsv; then
+				vclust_cluster=$(grep "$contig" clustering/clusters.tsv | cut -f2)
+			else
+				vclust_cluster="Discarded by breadth"
+			fi
+			echo -e "${species}\t${library}\t${source}\t${contig}\t${vs2_line}\t${checkv_line}\t${checkv_classification}\t${metabuli_score}\t${metabuli_class}\t${vclust_cluster}" >> psyche_viruses_summary.SPADES.tsv
 		done
 	fi
 done
